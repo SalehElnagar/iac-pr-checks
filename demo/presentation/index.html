@@ -1,0 +1,977 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Automating Terraform Quality with GitHub Pull Request Checks</title>
+  <meta name="description" content="A 45-minute session on building production-ready Terraform and Terragrunt pull request checks with GitHub Actions.">
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reset.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/theme/black.css" id="theme">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/monokai.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+  <style>
+    :root {
+      --bg-deep:       #0a0e1a;
+      --bg-card:       rgba(15, 23, 42, 0.65);
+      --glass-border:  rgba(100, 140, 255, 0.15);
+      --glass-blur:    12px;
+      --accent-blue:   #60a5fa;
+      --accent-cyan:   #22d3ee;
+      --accent-purple: #a78bfa;
+      --accent-green:  #34d399;
+      --accent-amber:  #fbbf24;
+      --accent-red:    #f87171;
+      --text-primary:  #e2e8f0;
+      --text-muted:    #94a3b8;
+      --font-sans:     'Inter', system-ui, -apple-system, sans-serif;
+      --font-mono:     'JetBrains Mono', 'Fira Code', monospace;
+      --gradient-hero: linear-gradient(135deg, #60a5fa 0%, #a78bfa 50%, #22d3ee 100%);
+    }
+
+    .reveal-viewport {
+      background: var(--bg-deep);
+      background-image:
+        radial-gradient(ellipse at 20% 50%, rgba(96,165,250,0.06) 0%, transparent 50%),
+        radial-gradient(ellipse at 80% 20%, rgba(167,139,250,0.05) 0%, transparent 50%),
+        radial-gradient(ellipse at 50% 80%, rgba(34,211,238,0.04) 0%, transparent 50%);
+    }
+
+    .reveal {
+      font-family: var(--font-sans);
+      font-size: 32px;
+      color: var(--text-primary);
+    }
+
+    .reveal h1, .reveal h2, .reveal h3, .reveal h4 {
+      font-family: var(--font-sans);
+      font-weight: 700;
+      text-transform: none;
+      letter-spacing: -0.02em;
+      line-height: 1.15;
+    }
+
+    .reveal h1 { font-size: 2.4em; }
+    .reveal h2 { font-size: 1.5em; margin-bottom: 0.3em; }
+    .reveal h3 { font-size: 1.1em; }
+
+    .reveal p, .reveal li {
+      font-weight: 400;
+      line-height: 1.55;
+    }
+
+    .reveal code { font-family: var(--font-mono); }
+
+    .reveal pre {
+      width: 100%;
+      font-size: 0.48em;
+      box-shadow: none;
+      margin: 0.4em 0;
+    }
+
+    .reveal pre code {
+      max-height: 480px;
+      padding: 0.8em 1em;
+      border-radius: 10px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid var(--glass-border);
+    }
+
+    .reveal .slides section { text-align: left; }
+    .reveal section img { border: none; box-shadow: none; background: none; }
+
+    /* Gradient text */
+    .gradient-text {
+      background: var(--gradient-hero);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .gradient-text-green {
+      background: linear-gradient(135deg, #34d399, #22d3ee);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .gradient-text-amber {
+      background: linear-gradient(135deg, #fbbf24, #f87171);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    /* Glass cards – tighter padding */
+    .glass {
+      background: var(--bg-card);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border: 1px solid var(--glass-border);
+      border-radius: 14px;
+      padding: 1em 1.4em;
+    }
+    .glass-sm {
+      background: var(--bg-card);
+      backdrop-filter: blur(var(--glass-blur));
+      -webkit-backdrop-filter: blur(var(--glass-blur));
+      border: 1px solid var(--glass-border);
+      border-radius: 10px;
+      padding: 0.7em 1em;
+    }
+
+    /* Layouts */
+    .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 1.2em; align-items: start; }
+    .three-col { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0.8em; align-items: start; }
+    .center-slide { text-align: center !important; }
+    .center-slide h1, .center-slide h2, .center-slide h3, .center-slide p { text-align: center !important; }
+
+    /* Badges */
+    .badge {
+      display: inline-block;
+      padding: 0.15em 0.6em;
+      font-size: 0.55em;
+      font-weight: 600;
+      border-radius: 999px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    .badge-blue   { background: rgba(96,165,250,0.18); color: var(--accent-blue); }
+    .badge-cyan   { background: rgba(34,211,238,0.18); color: var(--accent-cyan); }
+    .badge-purple { background: rgba(167,139,250,0.18); color: var(--accent-purple); }
+    .badge-green  { background: rgba(52,211,153,0.18); color: var(--accent-green); }
+    .badge-amber  { background: rgba(251,191,36,0.18); color: var(--accent-amber); }
+    .badge-red    { background: rgba(248,113,113,0.18); color: var(--accent-red); }
+
+    /* Pipeline visual */
+    .pipeline-row { display: flex; align-items: center; justify-content: center; gap: 0; margin: 1em 0; }
+    .pipeline-stage {
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 0.8em 1.2em; border-radius: 14px; min-width: 140px; text-align: center;
+      transition: transform 0.3s ease, box-shadow 0.3s ease; cursor: pointer;
+    }
+    .pipeline-stage:hover { transform: translateY(-4px); box-shadow: 0 8px 30px rgba(96,165,250,0.15); }
+    .pipeline-arrow { font-size: 1.6em; color: var(--text-muted); margin: 0 0.3em; opacity: 0.5; }
+    .stage-icon { font-size: 1.6em; margin-bottom: 0.2em; }
+    .stage-label { font-size: 0.6em; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+    .stage-sub { font-size: 0.44em; color: var(--text-muted); margin-top: 0.15em; }
+    .stage-fmt     { background: rgba(96,165,250,0.12); border: 1px solid rgba(96,165,250,0.25); color: var(--accent-blue); }
+    .stage-validate{ background: rgba(167,139,250,0.12); border: 1px solid rgba(167,139,250,0.25); color: var(--accent-purple); }
+    .stage-lint    { background: rgba(34,211,238,0.12); border: 1px solid rgba(34,211,238,0.25); color: var(--accent-cyan); }
+    .stage-report  { background: rgba(52,211,153,0.12); border: 1px solid rgba(52,211,153,0.25); color: var(--accent-green); }
+
+    /* Lists */
+    .reveal ul { list-style: none; padding-left: 0; }
+    .reveal ul li { position: relative; padding-left: 1.3em; margin-bottom: 0.3em; }
+    .reveal ul li::before { content: '▸'; position: absolute; left: 0; color: var(--accent-blue); font-weight: 700; }
+    .reveal .plain-list li::before { content: none; }
+    .reveal .plain-list li { padding-left: 0; }
+
+    /* Tables */
+    .reveal table {
+      border-collapse: separate; border-spacing: 0; width: 100%;
+      font-size: 0.65em; border-radius: 10px; overflow: hidden;
+      border: 1px solid var(--glass-border);
+    }
+    .reveal table thead th {
+      background: rgba(96,165,250,0.12); color: var(--accent-blue);
+      font-weight: 600; padding: 0.6em 0.8em; text-align: left;
+      border-bottom: 1px solid var(--glass-border);
+    }
+    .reveal table tbody td { padding: 0.5em 0.8em; border-bottom: 1px solid rgba(100,140,255,0.07); }
+    .reveal table tbody tr:last-child td { border-bottom: none; }
+    .reveal table tbody tr:hover { background: rgba(96,165,250,0.05); }
+
+    /* Stat cards */
+    .stat-number { font-size: 2.2em; font-weight: 800; line-height: 1; margin-bottom: 0.1em; }
+    .stat-label { font-size: 0.55em; color: var(--text-muted); font-weight: 500; }
+
+    /* Animations */
+    @keyframes float {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-8px); }
+    }
+    @keyframes pulse-glow {
+      0%, 100% { box-shadow: 0 0 20px rgba(96,165,250,0.1); }
+      50% { box-shadow: 0 0 40px rgba(96,165,250,0.25); }
+    }
+    @keyframes demo-pulse {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.05); }
+    }
+    @keyframes blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    @keyframes ripple {
+      0% { box-shadow: 0 0 0 0 rgba(52,211,153,0.4); }
+      100% { box-shadow: 0 0 0 30px rgba(52,211,153,0); }
+    }
+    .float-anim { animation: float 4s ease-in-out infinite; }
+    .pulse-glow { animation: pulse-glow 3s ease-in-out infinite; }
+
+    /* Code inline */
+    .reveal code:not(pre code) {
+      background: rgba(96,165,250,0.1); color: var(--accent-cyan);
+      padding: 0.1em 0.35em; border-radius: 5px; font-size: 0.85em;
+    }
+
+    /* Divider */
+    .divider {
+      height: 2px;
+      background: linear-gradient(90deg, transparent, var(--accent-blue), var(--accent-purple), transparent);
+      border: none; margin: 0.6em 0; opacity: 0.5;
+    }
+
+    .muted { color: var(--text-muted); }
+    .small { font-size: 0.7em; }
+    .xsmall { font-size: 0.55em; }
+
+    /* Demo Time button */
+    .demo-btn {
+      display: inline-block;
+      padding: 0.5em 2em;
+      font-size: 0.8em;
+      font-weight: 700;
+      color: #0a0e1a;
+      background: linear-gradient(135deg, #34d399, #22d3ee);
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      animation: demo-pulse 2s ease-in-out infinite;
+    }
+    .demo-btn:hover {
+      transform: scale(1.08);
+      box-shadow: 0 0 40px rgba(52,211,153,0.4);
+    }
+
+    /* Live indicator */
+    .live-dot {
+      display: inline-block;
+      width: 12px; height: 12px;
+      background: var(--accent-red);
+      border-radius: 50%;
+      margin-right: 0.4em;
+      animation: blink 1.5s ease-in-out infinite;
+      vertical-align: middle;
+    }
+
+    /* Scenario step cards */
+    .step-card {
+      display: flex; align-items: center; gap: 0.6em;
+      background: var(--bg-card); border: 1px solid var(--glass-border);
+      border-radius: 10px; padding: 0.5em 0.8em; margin-bottom: 0.5em;
+      transition: transform 0.2s ease, background 0.2s ease;
+      cursor: pointer;
+    }
+    .step-card:hover {
+      transform: translateX(6px);
+      background: rgba(96,165,250,0.08);
+    }
+    .step-num {
+      display: flex; align-items: center; justify-content: center;
+      width: 32px; height: 32px; border-radius: 50%; font-weight: 700;
+      font-size: 0.6em; flex-shrink: 0;
+    }
+    .step-text { font-size: 0.52em; }
+
+    /* Responsive */
+    @media (max-width: 900px) {
+      .two-col, .three-col { grid-template-columns: 1fr; }
+      .pipeline-row { flex-wrap: wrap; }
+    }
+
+    .reveal .progress { height: 4px; }
+    .reveal .progress span { background: var(--gradient-hero); }
+    .reveal .slide-number {
+      font-family: var(--font-mono); font-size: 14px;
+      color: var(--text-muted); background: transparent;
+    }
+  </style>
+</head>
+
+<body>
+<div class="reveal">
+<div class="slides">
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 1. TITLE                                        -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section class="center-slide" data-background-gradient="linear-gradient(135deg, #0a0e1a 0%, #111827 50%, #0f172a 100%)">
+    <div style="margin-bottom: 1em;">
+      <span style="font-size: 3.2em;">🛡️</span>
+    </div>
+    <h1 style="font-size: 2em; margin-bottom: 0.3em;">
+      <span class="gradient-text">Automating Terraform Quality</span>
+    </h1>
+    <p style="font-size: 0.7em; color: var(--text-muted); max-width: 700px; margin: 0 auto 1.2em;">
+      GitHub Pull Request Checks for Terraform &amp; Terragrunt<br>
+      <span style="font-size: 0.8em;">Three visible checks, targeted scope, reviewer-friendly feedback</span>
+    </p>
+    <div style="display: flex; gap: 0.6em; justify-content: center; flex-wrap: wrap;">
+      <span class="badge badge-blue">Terraform</span>
+      <span class="badge badge-purple">Terragrunt</span>
+      <span class="badge badge-cyan">TFLint</span>
+      <span class="badge badge-green">GitHub Actions</span>
+    </div>
+    <hr class="divider" style="max-width: 280px; margin: 1.5em auto 0;">
+    <p class="xsmall muted" style="text-align: center;">Saleh Elnagar · Platform Engineering</p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 2. SESSION ROADMAP                              -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section>
+    <h2><span class="gradient-text">45-Minute Roadmap</span></h2>
+    <hr class="divider">
+
+    <div class="three-col" style="margin-top: 0.6em;">
+      <div class="glass">
+        <span class="badge badge-blue">0-12 min</span>
+        <h3 style="font-size: 0.72em; margin: 0.5em 0 0.3em;">Why This Matters</h3>
+        <ul style="font-size: 0.54em;">
+          <li>Reviewer pain points</li>
+          <li>What the three checks actually solve</li>
+          <li>Why required checks beat best-effort tooling</li>
+        </ul>
+      </div>
+      <div class="glass">
+        <span class="badge badge-purple">12-27 min</span>
+        <h3 style="font-size: 0.72em; margin: 0.5em 0 0.3em;">How It Works</h3>
+        <ul style="font-size: 0.54em;">
+          <li>Target discovery</li>
+          <li>Fmt, validate, and lint jobs</li>
+          <li>PR comments, branch protection, local helpers</li>
+        </ul>
+      </div>
+      <div class="glass pulse-glow">
+        <span class="badge badge-green">27-45 min</span>
+        <h3 style="font-size: 0.72em; margin: 0.5em 0 0.3em;">Live Demo + Q&amp;A</h3>
+        <ul style="font-size: 0.54em;">
+          <li>Formatting failure</li>
+          <li>Validation failure</li>
+          <li>Lint failure, then all green</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="glass-sm" style="margin-top: 0.8em;">
+      <h3 style="font-size: 0.64em; color: var(--accent-cyan); margin-bottom: 0.25em;">Audience takeaway</h3>
+      <p style="font-size: 0.54em; color: var(--text-muted); margin: 0;">
+        You should leave with a simple mental model: <strong>three required PR checks</strong>,
+        <strong>changed-only targeting</strong>, and <strong>a PR comment that tells reviewers exactly what failed</strong>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 2. THE PROBLEM                                  -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section>
+    <h2><span class="gradient-text-amber">The Problem</span></h2>
+    <hr class="divider">
+    <div class="two-col" style="margin-top: 0.6em;">
+      <div class="glass">
+        <h3 style="font-size: 0.75em; color: var(--accent-red); margin-bottom: 0.4em;">😰 Without Automation</h3>
+        <ul style="font-size: 0.6em;">
+          <li>Reviewers burn time on whitespace and obvious mistakes</li>
+          <li>Invalid Terraform or Terragrunt changes reach <code>main</code></li>
+          <li>Lint issues show up late or not at all</li>
+          <li>PR feedback is inconsistent across engineers</li>
+          <li>Merges depend on memory instead of enforceable checks</li>
+        </ul>
+      </div>
+      <div class="glass pulse-glow">
+        <h3 style="font-size: 0.75em; color: var(--accent-green); margin-bottom: 0.4em;">✅ With IaC PR Checks</h3>
+        <ul style="font-size: 0.6em;">
+          <li>Every PR gets <strong>fmt</strong>, <strong>validate</strong>, and <strong>lint</strong></li>
+          <li>Checks run only against impacted modules and Terragrunt units</li>
+          <li>Branch protection blocks merge until the PR is green</li>
+          <li>A single PR comment shows results, scope, and issues</li>
+          <li>Humans can focus on design and risk, not avoidable noise</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 3. ARCHITECTURE OVERVIEW                        -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section class="center-slide">
+    <h2><span class="gradient-text">Architecture Overview</span></h2>
+    <hr class="divider" style="max-width: 280px; margin: 0.3em auto 1.2em;">
+
+    <div class="pipeline-row">
+      <div class="pipeline-stage stage-fmt float-anim" style="animation-delay: 0s;">
+        <div class="stage-icon">🎨</div>
+        <div class="stage-label">iac / fmt</div>
+        <div class="stage-sub">terraform fmt<br>terragrunt hcl fmt</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-stage stage-validate float-anim" style="animation-delay: 0.3s;">
+        <div class="stage-icon">✔️</div>
+        <div class="stage-label">iac / validate</div>
+        <div class="stage-sub">terraform validate<br>terragrunt hcl validate</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-stage stage-lint float-anim" style="animation-delay: 0.6s;">
+        <div class="stage-icon">🔍</div>
+        <div class="stage-label">iac / lint</div>
+        <div class="stage-sub">TFLint<br>PR comment update</div>
+      </div>
+      <div class="pipeline-arrow">→</div>
+      <div class="pipeline-stage stage-report float-anim" style="animation-delay: 0.9s;">
+        <div class="stage-icon">📋</div>
+        <div class="stage-label">Review UX</div>
+        <div class="stage-sub">Required checks<br>PR comment + summaries</div>
+      </div>
+    </div>
+
+    <p class="small muted" style="text-align: center; margin-top: 1.2em;">
+       Three visible required jobs · fmt &amp; validate run <strong>in parallel</strong> · lint publishes the final reviewer summary
+    </p>
+  </section>
+
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 5. SMART TARGET DISCOVERY (condensed)           -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section>
+    <h2><span class="gradient-text">Smart Target Discovery</span></h2>
+    <hr class="divider">
+
+    <div class="two-col" style="margin-top: 0.4em;">
+      <div>
+        <div class="glass-sm" style="margin-bottom: 0.6em;">
+          <h3 style="font-size: 0.65em; color: var(--accent-cyan); margin-bottom: 0.3em;">🧠 How It Works</h3>
+          <ul style="font-size: 0.52em;">
+            <li>Computes <code>git diff</code> between base &amp; head</li>
+            <li>Classifies: Module? Terragrunt unit? Shared HCL?</li>
+            <li>Resolves module → live unit dependencies</li>
+            <li>Generates a runtime manifest for the three jobs</li>
+          </ul>
+        </div>
+        <div class="glass-sm">
+          <h3 style="font-size: 0.65em; color: var(--accent-amber); margin-bottom: 0.3em;">🎯 Selection Modes</h3>
+          <div style="font-size: 0.52em; display: grid; grid-template-columns: auto 1fr; gap: 0.15em 0.5em; align-items: center;" class="plain-list">
+            <span class="badge badge-blue" style="font-size: 0.9em;">auto</span> <span>changed-only targeting for PRs and pushes</span>
+            <span class="badge badge-purple" style="font-size: 0.9em;">full</span> <span>all discovered Terraform roots and live units</span>
+            <span class="badge badge-amber" style="font-size: 0.9em;">path</span> <span>one explicit path plus directly related targets</span>
+          </div>
+        </div>
+      </div>
+      <div>
+        <div class="glass-sm" style="margin-bottom: 0.55em;">
+          <h3 style="font-size: 0.62em; color: var(--accent-green); margin-bottom: 0.25em;">Example: One Terraform Module Change</h3>
+          <p style="font-size: 0.48em; color: var(--text-muted); margin: 0;">
+            Change <code>Modules/resource_group/versions.tf</code> and discovery expands only to the directly impacted checks and Terragrunt unit.
+          </p>
+        </div>
+        <div class="glass" style="padding: 0.9em 1.1em;">
+          <div style="display: grid; gap: 0.55em;">
+            <div class="glass-sm" style="padding: 0.55em 0.75em;">
+              <h3 style="font-size: 0.56em; color: var(--accent-blue); margin-bottom: 0.2em;">Changed File</h3>
+              <p style="font-size: 0.5em; margin: 0;"><code>Modules/resource_group/versions.tf</code></p>
+            </div>
+            <div class="glass-sm" style="padding: 0.55em 0.75em;">
+              <h3 style="font-size: 0.56em; color: var(--accent-purple); margin-bottom: 0.2em;">Discovery Result</h3>
+              <ul style="font-size: 0.48em; margin: 0;">
+                <li><code>terraform fmt</code> → <code>Modules/resource_group</code></li>
+                <li><code>terraform validate</code> → <code>Modules/resource_group</code></li>
+                <li><code>tflint</code> → <code>Modules/resource_group</code></li>
+                <li><code>terragrunt validate</code> → <code>Live/.../resource-group</code></li>
+              </ul>
+            </div>
+            <div class="glass-sm" style="padding: 0.55em 0.75em;">
+              <h3 style="font-size: 0.56em; color: var(--accent-cyan); margin-bottom: 0.2em;">What Does Not Happen</h3>
+              <ul style="font-size: 0.48em; margin: 0;">
+                <li>No whole-repo scan for every PR</li>
+                <li>No hand-maintained target inventory file</li>
+                <li>No extra reviewer guesswork about scope</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 6. STAGE 1: FORMAT                              -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section>
+    <div style="display: flex; align-items: center; gap: 0.5em; margin-bottom: 0.2em;">
+      <span class="badge badge-blue">Stage 1</span>
+      <h2 style="margin: 0;"><span class="gradient-text">Formatting Checks</span></h2>
+    </div>
+    <hr class="divider">
+
+    <div class="two-col" style="margin-top: 0.5em;">
+      <div>
+        <div class="glass-sm" style="margin-bottom: 0.6em;">
+          <h3 style="font-size: 0.65em; color: var(--accent-blue); margin-bottom: 0.3em;">What It Does</h3>
+          <ul style="font-size: 0.52em;">
+            <li><code>terraform fmt -check -diff -recursive</code> on impacted module roots</li>
+            <li><code>terragrunt hcl fmt --check --diff</code> on impacted HCL files</li>
+            <li>Fails fast without rewriting files in CI</li>
+            <li>Writes a JSON report for the PR summary</li>
+          </ul>
+        </div>
+        <div class="glass-sm">
+          <h3 style="font-size: 0.65em; color: var(--accent-purple); margin-bottom: 0.3em;">Report Capture</h3>
+          <p style="font-size: 0.5em; color: var(--text-muted);">
+            Results written to <code>fmt-result.json</code>, uploaded as a GitHub Actions artifact.
+            The lint job later downloads all reports and composes the unified PR comment.
+          </p>
+        </div>
+      </div>
+      <div>
+        <pre><code class="language-bash">#!/usr/bin/env bash
+# run_iac_fmt.sh (simplified)
+
+discover_targets "${json_path}"
+
+# ── Terraform ──
+for dir in $(terraform_fmt_dirs); do
+  terraform -chdir="${dir}" \
+    fmt -check -diff -recursive
+done
+
+# ── Terragrunt ──
+for file in $(terragrunt_fmt_files); do
+  terragrunt hcl fmt \
+    --check --diff --file "${file}"
+done
+
+write_fmt_report "${result}"</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 7. STAGE 2: VALIDATE                            -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section>
+    <div style="display: flex; align-items: center; gap: 0.5em; margin-bottom: 0.2em;">
+      <span class="badge badge-purple">Stage 2</span>
+      <h2 style="margin: 0;"><span class="gradient-text">Validation Checks</span></h2>
+    </div>
+    <hr class="divider">
+
+    <div class="two-col" style="margin-top: 0.5em;">
+      <div>
+        <div class="glass-sm" style="margin-bottom: 0.6em;">
+          <h3 style="font-size: 0.65em; color: var(--accent-purple); margin-bottom: 0.3em;">What It Does</h3>
+          <ul style="font-size: 0.52em;">
+            <li><code>terraform init -backend=false -input=false</code> + <code>validate</code></li>
+            <li><code>terragrunt hcl validate --inputs</code> per impacted unit</li>
+            <li>Catches missing inputs, bad refs, and type problems</li>
+            <li>Runs in parallel with formatting for fast feedback</li>
+          </ul>
+        </div>
+        <div class="glass-sm">
+          <h3 style="font-size: 0.65em; color: var(--accent-amber); margin-bottom: 0.3em;">Why It Stays CI-Safe</h3>
+          <p style="font-size: 0.5em; color: var(--text-muted);">
+            No <code>plan</code>, no <code>apply</code>, no cloud credentials.
+            The helper rewrites GitHub SSH module sources to HTTPS so public tagged modules can be fetched safely during <code>init</code>.
+          </p>
+        </div>
+      </div>
+      <div>
+        <pre><code class="language-bash">#!/usr/bin/env bash
+# run_iac_validate.sh (simplified)
+
+discover_targets "${json_path}"
+
+# ── Terraform ──
+for dir in $(terraform_validate_dirs); do
+  run_with_public_github_module_access \
+  terraform -chdir="${dir}" \
+    init -backend=false -input=false
+  run_with_public_github_module_access \
+  terraform -chdir="${dir}" validate
+done
+
+# ── Terragrunt ──
+for dir in $(terragrunt_validate_dirs); do
+  terragrunt hcl validate \
+    --inputs --working-dir "${dir}"
+done
+
+write_validate_report "${result}"</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 8. STAGE 3: LINT & REPORT                       -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section>
+    <div style="display: flex; align-items: center; gap: 0.5em; margin-bottom: 0.2em;">
+      <span class="badge badge-cyan">Stage 3</span>
+      <h2 style="margin: 0;"><span class="gradient-text">Lint &amp; Report</span></h2>
+    </div>
+    <hr class="divider">
+
+    <div class="two-col" style="margin-top: 0.5em;">
+      <div>
+        <div class="glass-sm" style="margin-bottom: 0.6em;">
+          <h3 style="font-size: 0.65em; color: var(--accent-cyan); margin-bottom: 0.3em;">TFLint Checks</h3>
+          <ul style="font-size: 0.52em;">
+            <li><code>tflint --chdir=&lt;module&gt;</code> per Terraform dir</li>
+            <li>Uses repo-level <code>.tflint.hcl</code> config</li>
+            <li><code>--call-module-type=none</code> for offline safety</li>
+            <li>Catches deprecated syntax &amp; best practices</li>
+          </ul>
+        </div>
+        <div class="glass-sm">
+          <h3 style="font-size: 0.65em; color: var(--accent-green); margin-bottom: 0.3em;">📋 Unified PR Comment</h3>
+          <ul style="font-size: 0.52em;">
+            <li>Downloads fmt &amp; validate report artifacts</li>
+            <li><code>render_pr_comment.py</code> composes Markdown</li>
+            <li><code>upsert_pr_comment.py</code> updates existing comment</li>
+            <li>Shows result table, issues, scope, and notes</li>
+          </ul>
+        </div>
+      </div>
+      <div>
+        <pre><code class="language-markdown">## IaC PR Checks
+
+| Check            | Result      | Scope              |
+| ---------------- | ----------- | ------------------ |
+| `iac / fmt`      | `success`   | 1 Terraform target |
+| `iac / validate` | `success`   | 1 Terragrunt unit  |
+| `iac / lint`     | `failure`   | 1 Terraform target |
+
+### Issues
+#### `iac / lint`
+- Terraform: `Modules/resource_group`
+
+Workflow run: [link →](https://...)</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 9. REPO STRUCTURE (condensed tree)              -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section>
+    <h2><span class="gradient-text">What Lives In The Repo</span></h2>
+    <hr class="divider">
+
+    <div class="two-col" style="margin-top: 0.4em;">
+      <div>
+        <pre><code class="language-text" style="font-size: 0.95em;">iac-pr-checks/
+├── .github/workflows/
+│   └── iac-pr-checks.yml    ← 3 visible checks
+├── scripts/ci/
+│   ├── discover_iac_targets.py ← Targeting
+│   ├── run_iac_fmt.sh          ← fmt
+│   ├── run_iac_validate.sh     ← validate
+│   ├── run_iac_lint.sh         ← lint
+│   └── ...                     ← shared helpers + PR comment
+├── Modules/                    ← Terraform modules
+├── Live/                       ← Terragrunt units
+└── demo/session/               ← Optional demo patches</code></pre>
+      </div>
+      <div>
+        <div class="glass-sm" style="margin-bottom: 0.6em;">
+          <h3 style="font-size: 0.65em; color: var(--accent-blue); margin-bottom: 0.3em;">📦 Real IaC Code</h3>
+          <p style="font-size: 0.48em; color: var(--text-muted);">
+            The workflow runs against the real Terraform modules and Terragrunt units that already exist in the repository.
+            That is important for trust: this is not a fake sample project.
+          </p>
+        </div>
+        <div class="glass-sm" style="margin-bottom: 0.6em;">
+          <h3 style="font-size: 0.65em; color: var(--accent-purple); margin-bottom: 0.3em;">🧰 Reusable Check Scripts</h3>
+          <p style="font-size: 0.48em; color: var(--text-muted);">
+            One discovery script plus one runner per check keeps the workflow readable and gives developers the same commands locally.
+          </p>
+        </div>
+        <div class="glass-sm">
+          <h3 style="font-size: 0.65em; color: var(--accent-green); margin-bottom: 0.3em;">🚀 Adoption Message</h3>
+          <p style="font-size: 0.48em; color: var(--text-muted);">
+            If your repo already has recognizable Terraform modules and Terragrunt units, you can add this without maintaining a second target inventory by hand.
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 10. DESIGN PRINCIPLES (compact 2x3 grid)        -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section>
+    <h2><span class="gradient-text">Why This Works In Practice</span></h2>
+    <hr class="divider">
+
+    <div class="two-col" style="margin-top: 0.5em;">
+      <div class="glass">
+        <div style="font-size: 1.35em; margin-bottom: 0.2em;">⚡</div>
+        <h3 style="font-size: 0.74em; color: var(--accent-blue); margin-bottom: 0.25em;">Fast</h3>
+        <p style="font-size: 0.5em; color: var(--text-muted); margin: 0;">
+          The workflow checks only the impacted Terraform modules and Terragrunt units, so feedback stays quick enough for normal PR work.
+        </p>
+      </div>
+      <div class="glass">
+        <div style="font-size: 1.35em; margin-bottom: 0.2em;">🔒</div>
+        <h3 style="font-size: 0.74em; color: var(--accent-purple); margin-bottom: 0.25em;">Safe</h3>
+        <p style="font-size: 0.5em; color: var(--text-muted); margin: 0;">
+          No <code>plan</code>, no <code>apply</code>, no cloud credentials. It is designed to be safe on pull requests and safe to demo live.
+        </p>
+      </div>
+    </div>
+    <div class="two-col" style="margin-top: 0.8em;">
+      <div class="glass">
+        <div style="font-size: 1.35em; margin-bottom: 0.2em;">📣</div>
+        <h3 style="font-size: 0.74em; color: var(--accent-cyan); margin-bottom: 0.25em;">Clear</h3>
+        <p style="font-size: 0.5em; color: var(--text-muted); margin: 0;">
+          Reviewers see three recognizable check names and one PR comment that tells them what failed and where to look.
+        </p>
+      </div>
+      <div class="glass">
+        <div style="font-size: 1.35em; margin-bottom: 0.2em;">🚦</div>
+        <h3 style="font-size: 0.74em; color: var(--accent-green); margin-bottom: 0.25em;">Enforceable</h3>
+        <p style="font-size: 0.5em; color: var(--text-muted); margin: 0;">
+          Once the three job names are required in branch protection, the process becomes consistent instead of optional.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 11. SECURITY & SUPPLY CHAIN                     -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section>
+    <h2><span class="gradient-text">Why You Can Turn This On</span></h2>
+    <hr class="divider">
+
+    <div class="two-col" style="margin-top: 0.5em;">
+      <div class="glass">
+        <div style="font-size: 1.35em; margin-bottom: 0.2em;">☁️</div>
+        <h3 style="font-size: 0.74em; color: var(--accent-blue); margin-bottom: 0.25em;">No Cloud Access Required</h3>
+        <p style="font-size: 0.5em; color: var(--text-muted); margin: 0;">
+          These checks stop at <code>fmt</code>, <code>validate</code>, and <code>lint</code>.
+          No <code>plan</code>, no <code>apply</code>, and no dependency on real backend access.
+        </p>
+      </div>
+      <div class="glass">
+        <div style="font-size: 1.35em; margin-bottom: 0.2em;">🔑</div>
+        <h3 style="font-size: 0.74em; color: var(--accent-purple); margin-bottom: 0.25em;">Minimal GitHub Permissions</h3>
+        <p style="font-size: 0.5em; color: var(--text-muted); margin: 0;">
+          Most jobs only need repository read access. Only the PR comment step needs write permission, and checkout does not persist credentials.
+        </p>
+      </div>
+    </div>
+
+    <div class="two-col" style="margin-top: 0.8em;">
+      <div class="glass">
+        <div style="font-size: 1.35em; margin-bottom: 0.2em;">📌</div>
+        <h3 style="font-size: 0.74em; color: var(--accent-cyan); margin-bottom: 0.25em;">Predictable Tooling</h3>
+        <p style="font-size: 0.5em; color: var(--text-muted); margin: 0;">
+          Terraform, Terragrunt, and TFLint are pinned to known versions, and the downloaded binaries are checksum-verified before use.
+        </p>
+      </div>
+      <div class="glass">
+        <div style="font-size: 1.35em; margin-bottom: 0.2em;">🚦</div>
+        <h3 style="font-size: 0.74em; color: var(--accent-green); margin-bottom: 0.25em;">Safe To Enforce</h3>
+        <p style="font-size: 0.5em; color: var(--text-muted); margin: 0;">
+          The three job names stay visible on PRs and on <code>main</code>, so branch protection can reliably block merges until the checks pass.
+        </p>
+      </div>
+    </div>
+
+    <div class="glass-sm" style="margin-top: 0.8em;">
+      <p style="font-size: 0.52em; color: var(--text-muted); margin: 0;">
+        This is the slide that answers the practical adoption question:
+        <strong>“Can I safely make these checks required?”</strong>
+      </p>
+    </div>
+  </section>
+
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 13. 🎬 DEMO TIME! (interactive interstitial)    -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section class="center-slide" data-background-gradient="linear-gradient(135deg, #0a0e1a 0%, #0d1f2d 50%, #0a0e1a 100%)" id="demo-time">
+    <div style="margin-bottom: 0.6em;">
+      <span style="font-size: 3.4em;">🎬</span>
+    </div>
+    <h1 style="font-size: 2em; margin-bottom: 0.25em;">
+      <span class="gradient-text-green">Demo Time!</span>
+    </h1>
+    <p style="font-size: 0.6em; color: var(--text-muted); max-width: 760px; margin: 0 auto 1.1em;">
+      We will break three small changes on purpose and watch the PR checks fail in the right place, then go green after the fix.
+    </p>
+
+    <div class="three-col" style="margin-top: 1.2em;">
+      <div class="glass" style="text-align: center;">
+        <div style="font-size: 1.3em; color: var(--accent-blue); margin-bottom: 0.15em;">1</div>
+        <h3 style="font-size: 0.72em; color: var(--accent-blue); margin-bottom: 0.2em;">Formatting</h3>
+        <p style="font-size: 0.52em; color: var(--text-muted); margin: 0;">Break indentation and watch <code>iac / fmt</code> fail.</p>
+      </div>
+      <div class="glass" style="text-align: center;">
+        <div style="font-size: 1.3em; color: var(--accent-purple); margin-bottom: 0.15em;">2</div>
+        <h3 style="font-size: 0.72em; color: var(--accent-purple); margin-bottom: 0.2em;">Validation</h3>
+        <p style="font-size: 0.52em; color: var(--text-muted); margin: 0;">Remove a required input and watch <code>iac / validate</code> fail.</p>
+      </div>
+      <div class="glass" style="text-align: center;">
+        <div style="font-size: 1.3em; color: var(--accent-cyan); margin-bottom: 0.15em;">3</div>
+        <h3 style="font-size: 0.72em; color: var(--accent-cyan); margin-bottom: 0.2em;">Linting</h3>
+        <p style="font-size: 0.52em; color: var(--text-muted); margin: 0;">Remove a version constraint and watch <code>iac / lint</code> fail.</p>
+      </div>
+    </div>
+
+    <p style="font-size: 0.5em; color: var(--text-muted); text-align: center; margin-top: 1em;">
+      Same loop every time: break, push, inspect the PR, fix, push, green.
+    </p>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 15. KEY TAKEAWAYS                               -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section>
+    <h2><span class="gradient-text">Key Takeaways</span></h2>
+    <hr class="divider">
+
+    <p style="font-size: 0.68em; color: var(--text-muted); margin: 0.35em 0 0.8em;">
+      The goal is not more CI. The goal is <strong>better infrastructure pull requests</strong>.
+    </p>
+
+    <div class="three-col" style="margin-top: 0.4em;">
+      <div class="glass" style="text-align: center;">
+        <div style="font-size: 1.3em; margin-bottom: 0.2em;">1</div>
+        <h3 style="font-size: 0.66em; color: var(--accent-blue); margin-bottom: 0.25em;">Automate The Obvious</h3>
+        <p style="font-size: 0.48em; color: var(--text-muted); margin: 0;">
+          Formatting, configuration validation, and linting should fail before a human reviewer has to point them out.
+        </p>
+      </div>
+      <div class="glass" style="text-align: center;">
+        <div style="font-size: 1.3em; margin-bottom: 0.2em;">2</div>
+        <h3 style="font-size: 0.66em; color: var(--accent-purple); margin-bottom: 0.25em;">Keep Checks Scoped</h3>
+        <p style="font-size: 0.48em; color: var(--text-muted); margin: 0;">
+          Target only the impacted Terraform modules and Terragrunt units so the workflow stays fast enough for normal PR work.
+        </p>
+      </div>
+      <div class="glass" style="text-align: center;">
+        <div style="font-size: 1.3em; margin-bottom: 0.2em;">3</div>
+        <h3 style="font-size: 0.66em; color: var(--accent-cyan); margin-bottom: 0.25em;">Make Results Actionable</h3>
+        <p style="font-size: 0.48em; color: var(--text-muted); margin: 0;">
+          Use clear check names, one clean PR comment, and required status checks so teams know what failed and cannot ignore it.
+        </p>
+      </div>
+    </div>
+
+    <div class="glass-sm" style="margin-top: 0.9em;">
+      <p style="font-size: 0.56em; margin: 0; color: var(--text-primary);">
+        When automation handles the avoidable issues, reviewers can spend their time on
+        <strong>architecture, risk, and logic</strong>.
+      </p>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 16. WHAT'S NEXT (compact 2x3)                   -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section>
+    <h2><span class="gradient-text">Adoption Path</span></h2>
+    <hr class="divider">
+
+    <div class="three-col" style="margin-top: 0.4em;">
+      <div class="glass-sm" style="text-align: center;">
+        <div style="font-size: 1.2em; margin-bottom: 0.2em;">📐</div>
+        <h3 style="font-size: 0.58em; color: var(--accent-blue); margin-bottom: 0.2em;">Start Small</h3>
+        <p style="font-size: 0.42em; color: var(--text-muted); margin: 0;">Pilot fmt, validate, and lint on one repo with stable job names</p>
+      </div>
+      <div class="glass-sm" style="text-align: center;">
+        <div style="font-size: 1.2em; margin-bottom: 0.2em;">🐋</div>
+        <h3 style="font-size: 0.58em; color: var(--accent-purple); margin-bottom: 0.2em;">Protect Merges</h3>
+        <p style="font-size: 0.42em; color: var(--text-muted); margin: 0;">Make <code>iac / fmt</code>, <code>iac / validate</code>, and <code>iac / lint</code> required</p>
+      </div>
+      <div class="glass-sm" style="text-align: center;">
+        <div style="font-size: 1.2em; margin-bottom: 0.2em;">🤖</div>
+        <h3 style="font-size: 0.58em; color: var(--accent-cyan); margin-bottom: 0.2em;">Teach Locally</h3>
+        <p style="font-size: 0.42em; color: var(--text-muted); margin: 0;">Give engineers the same local helper scripts the workflow uses</p>
+      </div>
+    </div>
+    <div class="three-col" style="margin-top: 0.6em;">
+      <div class="glass-sm" style="text-align: center;">
+        <div style="font-size: 1.2em; margin-bottom: 0.2em;">💰</div>
+        <h3 style="font-size: 0.58em; color: var(--accent-green); margin-bottom: 0.2em;">Add Security Next</h3>
+        <p style="font-size: 0.42em; color: var(--text-muted); margin: 0;">Layer in Checkov or Trivy after the core checks earn trust</p>
+      </div>
+      <div class="glass-sm" style="text-align: center;">
+        <div style="font-size: 1.2em; margin-bottom: 0.2em;">📦</div>
+        <h3 style="font-size: 0.58em; color: var(--accent-amber); margin-bottom: 0.2em;">Add Plan Carefully</h3>
+        <p style="font-size: 0.42em; color: var(--text-muted); margin: 0;">Only after you decide how to handle credentials and internal-only execution</p>
+      </div>
+      <div class="glass-sm" style="text-align: center;">
+        <div style="font-size: 1.2em; margin-bottom: 0.2em;">📈</div>
+        <h3 style="font-size: 0.58em; color: var(--accent-red); margin-bottom: 0.2em;">Measure Outcomes</h3>
+        <p style="font-size: 0.42em; color: var(--text-muted); margin: 0;">Track pass rates, failure categories, and mean time to green</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════ -->
+  <!-- 17. THANK YOU                                   -->
+  <!-- ═══════════════════════════════════════════════ -->
+  <section class="center-slide" data-background-gradient="linear-gradient(135deg, #0a0e1a 0%, #111827 50%, #0f172a 100%)">
+    <div style="margin-bottom: 0.8em;">
+      <span style="font-size: 3em;">🚀</span>
+    </div>
+    <h1 style="font-size: 2em; margin-bottom: 0.3em;">
+      <span class="gradient-text">Thank You</span>
+    </h1>
+    <hr class="divider" style="max-width: 200px; margin: 0.8em auto;">
+    <p style="font-size: 0.65em; color: var(--text-muted); text-align: center;">
+      Questions? Let's discuss.
+    </p>
+    <div style="display: flex; gap: 0.6em; justify-content: center; margin-top: 1.2em; flex-wrap: wrap;">
+      <span class="badge badge-blue" style="font-size: 0.6em;">github.com/SalehElnagar</span>
+      <span class="badge badge-purple" style="font-size: 0.6em;">iac-pr-checks</span>
+    </div>
+  </section>
+
+</div><!-- /slides -->
+</div><!-- /reveal -->
+
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/dist/reveal.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/highlight/highlight.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js@5.1.0/plugin/zoom/zoom.js"></script>
+<script>
+  Reveal.initialize({
+    hash: true,
+    hashOneBasedIndex: false,
+    slideNumber: 'c/t',
+    showSlideNumber: 'all',
+    transition: 'slide',
+    transitionSpeed: 'default',
+    backgroundTransition: 'fade',
+    center: true,
+    width: 1280,
+    height: 720,
+    margin: 0.04,
+    plugins: [
+      RevealHighlight,
+      RevealZoom
+    ]
+  });
+
+  // Keyboard shortcut: press 'D' to jump to Demo Time slide
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'd' || e.key === 'D') {
+      var demoSlide = document.getElementById('demo-time');
+      if (demoSlide) {
+        var indices = Reveal.getIndices(demoSlide);
+        Reveal.slide(indices.h, indices.v);
+      }
+    }
+  });
+</script>
+</body>
+</html>

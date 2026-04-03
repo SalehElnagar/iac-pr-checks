@@ -1,0 +1,8 @@
+terraform:
+  required_version: ">= 1.6.0"
+  azurerm_provider_version: "~> 3.0"
+
+terragrunt:
+  remote_state:
+    state_file_name: "terraform.tfstate"
+    use_azuread_auth: true

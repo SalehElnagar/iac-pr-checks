@@ -1,0 +1,11 @@
+diff --git a/Live/network-security/foundation/resource-group/terragrunt.hcl b/Live/network-security/foundation/resource-group/terragrunt.hcl
+--- a/Live/network-security/foundation/resource-group/terragrunt.hcl
++++ b/Live/network-security/foundation/resource-group/terragrunt.hcl
+@@ -12,6 +12,7 @@ locals {
+ }
+ 
+ inputs = {
++  location              = include.root.locals.region.location
+   namespace             = local.foundation.namespace
+   application           = local.foundation.application
+   environment           = local.foundation.environment

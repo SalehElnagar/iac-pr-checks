@@ -1,0 +1,12 @@
+subscription_key: "mvp"
+subscription_id: "00000000-0000-0000-0000-000000000000"
+tenant_id: "00000000-0000-0000-0000-000000000000"
+
+backend:
+  resource_group_name: "rg-tfstate-example"
+  storage_account_name: "sttfstateexample01"
+  container_name: "tfstate"
+  state_key_prefix: "azure/mvp"
+
+modules:
+  ref: "article-02-foundation-v3"

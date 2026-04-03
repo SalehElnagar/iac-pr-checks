@@ -1,0 +1,66 @@
+policy:
+  purpose: "firewall-policy"
+  attributes:
+    - "hub"
+  sku: "Standard"
+  threat_intelligence_mode: "Alert"
+  dns:
+    proxy_enabled: true
+    servers: []
+  rule_collection_groups:
+    base-network:
+      priority: 100
+      attributes:
+        - "base"
+        - "network"
+      network_rule_collections:
+        allow-dns:
+          priority: 100
+          action: "Allow"
+          rules:
+            dns-any:
+              description: "Allow DNS from the spoke workload subnet."
+              source_addresses:
+                - "10.20.0.0/26"
+              destination_addresses:
+                - "*"
+              destination_ports:
+                - "53"
+              protocols:
+                - "TCP"
+                - "UDP"
+    base-application:
+      priority: 200
+      attributes:
+        - "base"
+        - "application"
+      application_rule_collections:
+        allow-linux-packages:
+          priority: 100
+          action: "Allow"
+          rules:
+            ubuntu-and-microsoft:
+              description: "Minimal outbound package repositories for the optional Linux test VM."
+              source_addresses:
+                - "10.20.0.0/26"
+              destination_fqdns:
+                - "packages.microsoft.com"
+                - "archive.ubuntu.com"
+                - "security.ubuntu.com"
+                - "aka.ms"
+              protocols:
+                - type: "Http"
+                  port: 80
+                - type: "Https"
+                  port: 443
+
+firewall:
+  purpose: "firewall"
+  attributes:
+    - "hub"
+  public_ip_purpose: "firewall"
+  public_ip_attributes:
+    - "hub"
+  sku_tier: "Standard"
+  zones: []
+  public_ip_zones: []

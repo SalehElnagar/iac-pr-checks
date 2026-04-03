@@ -1,0 +1,17 @@
+enabled: false
+target_subnet_key: "workload"
+virtual_machine_name: null
+virtual_machine_purpose: "test"
+attributes:
+  - "spoke"
+admin_username: "azureuser"
+ssh_public_keys:
+  - "ssh-rsa CHANGE_ME"
+size: "Standard_B2s"
+public_ip_create: false
+private_ip_allocation_method: "Dynamic"
+source_image:
+  publisher: "Canonical"
+  offer: "0001-com-ubuntu-server-jammy"
+  sku: "22_04-lts-gen2"
+  version: "latest"

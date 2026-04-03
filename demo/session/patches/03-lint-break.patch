@@ -1,0 +1,10 @@
+diff --git a/Modules/resource_group/versions.tf b/Modules/resource_group/versions.tf
+--- a/Modules/resource_group/versions.tf
++++ b/Modules/resource_group/versions.tf
+@@ -1,6 +1,4 @@
+ terraform {
+-  required_version = ">= 1.6.0"
+-
+   required_providers {
+     azurerm = {
+       source  = "hashicorp/azurerm"

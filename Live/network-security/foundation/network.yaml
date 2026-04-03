@@ -1,0 +1,58 @@
+hub:
+  purpose: "hub"
+  attributes: []
+  address_space:
+    - "10.10.0.0/24"
+  dns_servers: []
+  subnets:
+    firewall:
+      name: "AzureFirewallSubnet"
+      purpose: "hub"
+      attributes:
+        - "firewall"
+      address_prefixes:
+        - "10.10.0.0/26"
+
+spoke:
+  purpose: "spoke"
+  attributes:
+    - "workload"
+  address_space:
+    - "10.20.0.0/24"
+  dns_servers: []
+  use_firewall_dns_proxy: true
+  subnets:
+    workload:
+      purpose: "workload"
+      attributes:
+        - "app"
+      address_prefixes:
+        - "10.20.0.0/26"
+      service_endpoints: []
+      delegations: {}
+
+peering:
+  local_alias: "hub"
+  remote_alias: "spoke"
+  hub_to_spoke:
+    allow_virtual_network_access: true
+    allow_forwarded_traffic: true
+    allow_gateway_transit: false
+    use_remote_gateways: false
+  spoke_to_hub:
+    allow_virtual_network_access: true
+    allow_forwarded_traffic: true
+    allow_gateway_transit: false
+    use_remote_gateways: false
+
+routing:
+  purpose: "egress"
+  attributes:
+    - "spoke"
+  disable_bgp_route_propagation: false
+  associated_subnet_keys:
+    - "workload"
+  routes:
+    default:
+      address_prefix: "0.0.0.0/0"
+      next_hop_type: "VirtualAppliance"

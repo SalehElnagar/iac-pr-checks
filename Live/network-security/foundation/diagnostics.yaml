@@ -1,0 +1,20 @@
+workspace:
+  purpose: "monitoring"
+  attributes:
+    - "firewall"
+  sku: "PerGB2018"
+  retention_in_days: 30
+  daily_quota_gb: null
+  internet_ingestion_enabled: true
+  internet_query_enabled: true
+
+diagnostic_setting:
+  purpose: "diagnostics"
+  attributes:
+    - "firewall"
+  log_analytics_destination_type: "Dedicated"
+  enabled_logs:
+    - category_group: "allLogs"
+  metrics:
+    - category: "AllMetrics"
+      enabled: true
