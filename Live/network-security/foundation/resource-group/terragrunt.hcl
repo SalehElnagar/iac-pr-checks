@@ -12,9 +12,9 @@ locals {
 }
 
 inputs = {
-  location              = include.root.locals.region.location
+  location = include.root.locals.region.location
   namespace             = local.foundation.namespace
-  application           = local.foundation.application
+  application         = local.foundation.application
   environment           = local.foundation.environment
   environment_instance  = local.foundation.environment_instance
   include_environment   = local.foundation.include_environment
